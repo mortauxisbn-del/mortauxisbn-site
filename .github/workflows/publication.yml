@@ -1,0 +1,31 @@
+name: Publication Automatique
+on:
+  repository_dispatch:
+    types: [new_submission]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Creer le fichier de l'article
+        run: |
+          FILENAME="content/fanzines/fanzine-$(date +%s).md"
+          echo "---" > $FILENAME
+          echo "title: \"${{ github.event.client_payload.nom }}\"" >> $FILENAME
+          echo "date: $(date +%Y-%m-%d)" >> $FILENAME
+          echo "image: \"${{ github.event.client_payload.image_url }}\"" >> $FILENAME
+          echo "lieu: \"${{ github.event.client_payload.lieu }}\"" >> $FILENAME
+          echo "---" >> $FILENAME
+          echo "" >> $FILENAME
+          echo "${{ github.event.client_payload.description }}" >> $FILENAME
+
+      - name: Commit et Push
+        run: |
+          git config --global user.name "Robot Mort Aux ISBN"
+          git config --global user.email "bot@mortauxisbn.com"
+          git add .
+          git commit -m "Nouvel article : ${{ github.event.client_payload.nom }}"
+          git push
