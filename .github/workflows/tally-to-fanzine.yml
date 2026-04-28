@@ -1,7 +1,8 @@
 name: Reception Fanzines Tally
 on:
   repository_dispatch:
-    types: [tally_submission]
+    types: [tally_submission, webhook]
+  workflow_dispatch:
 
 jobs:
   create_file:
@@ -12,7 +13,6 @@ jobs:
 
       - name: Create Fanzine File
         run: |
-          # Nettoyage du titre pour le nom du fichier
           TITLE=$(echo "${{ github.event.client_payload.data.titre_du_fanzine_sans_titre_testtitre_du_fanzine_ }}" | sed 's/[^a-zA-Z0-9]/_/g' | tr '[:upper:]' '[:lower:]')
           FILENAME="content/fanzines/${TITLE}_$(date +%Y%m%d%H%M%S).md"
           
@@ -61,5 +61,5 @@ jobs:
           git config --global user.name "Tally Bot"
           git config --global user.email "bot@tally.so"
           git add content/fanzines/*.md
-          git commit -m "Nouveau fanzine : ${{ github.event.client_payload.data.titre_du_fanzine_sans_titre_testtitre_du_fanzine_ }}"
+          git commit -m "Nouveau fanzine reçu"
           git push
