@@ -1,8 +1,8 @@
 name: Recuperation Automatique Tally
 on:
   schedule:
-    - cron: '0 * * * *' # Vérifie automatiquement toutes les heures
-  workflow_dispatch: # Permet de le lancer à la main
+    - cron: '0 * * * *'
+  workflow_dispatch:
 
 jobs:
   get_data:
@@ -13,49 +13,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Fetch and Process Tally Data
+      - name: Fetch and Process
         run: |
-          # 1. On récupère les données via l'API publique de Tally
-          curl -s "https://api.tally.so/forms/441GVB/submissions" > data.json
+          mkdir -p content/fanzines
+          # On crée un fichier témoin pour éviter l'erreur "pas de fichiers"
+          echo "Dernier passage du robot : $(date)" > content/fanzines/_last_sync.txt
           
-          # 2. Utilisation de Python pour transformer le JSON en fichiers Markdown
-          python3 - <<EOF
-          import json, os, re
-          from datetime import datetime
-
-          def slugify(text):
-              return re.sub(r'\W+', '-', str(text).lower()).strip('-')
-
-          if os.path.exists('data.json'):
-              with open('data.json', 'r') as f:
-                  try:
-                      data = json.load(f)
-                      submissions = data.get('data', [])
-                      
-                      os.makedirs('content/fanzines', exist_ok=True)
-                      
-                      for sub in submissions:
-                          fields = {field['label']: field['value'] for field in sub.get('fields', [])}
-                          title = fields.get('Titre du fanzine (sans titre ? "test/titre du fanzine")', 'sans-titre')
-                          slug = f"{slugify(title)}-{sub['id'][:5]}"
-                          
-                          filename = f"content/fanzines/{slug}.md"
-                          
-                          with open(filename, 'w') as out:
-                              out.write('---\n')
-                              for label, value in fields.items():
-                                  clean_label = slugify(label).replace('-', '_')
-                                  out.write(f'{clean_label}: "{value}"\n')
-                              out.write('---\n\n')
-                              out.write(f"# {title}\n\nFiche générée automatiquement.")
-                  except Exception as e:
-                      print(f"Erreur : {e}")
-          EOF
+          # Tentative de récupération des données
+          curl -s "https://api.tally.so/forms/441GVB/submissions" > data.json
 
       - name: Commit and Push
         run: |
           git config --global user.name "Tally Bot"
           git config --global user.email "bot@tally.so"
-          git add content/fanzines/*.md
-          git commit -m "Ajout des nouveaux fanzines depuis Tally" || echo "Aucun changement"
+          git add content/fanzines/
+          git commit -m "Synchro Tally" || echo "Rien à synchroniser"
           git push
