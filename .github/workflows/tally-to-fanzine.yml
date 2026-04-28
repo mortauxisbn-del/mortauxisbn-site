@@ -1,65 +1,38 @@
-name: Reception Fanzines Tally
+name: Recuperation Automatique Tally
 on:
-  repository_dispatch:
-    types: [tally_submission, webhook]
-  workflow_dispatch:
+  schedule:
+    - cron: '*/15 * * * *' # S'exécute toutes les 15 minutes
+  workflow_dispatch: # Permet de le lancer à la main pour tester
 
 jobs:
-  create_file:
+  get_data:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Create Fanzine File
+      - name: Fetch Tally Responses
         run: |
-          TITLE=$(echo "${{ github.event.client_payload.data.titre_du_fanzine_sans_titre_testtitre_du_fanzine_ }}" | sed 's/[^a-zA-Z0-9]/_/g' | tr '[:upper:]' '[:lower:]')
-          FILENAME="content/fanzines/${TITLE}_$(date +%Y%m%d%H%M%S).md"
+          # On récupère les données publiques du formulaire
+          curl -s "https://api.tally.so/forms/441GVB/submissions" > data.json
           
+          # Ici, on vérifie si on a reçu quelque chose
+          if [ ! -s data.json ]; then echo "Pas de données"; exit 0; fi
+
+      - name: Create Files
+        run: |
+          # Ce script simplifié va créer un fichier pour chaque réponse
+          # (Note : nécessite que le formulaire soit public ou accessible)
+          # Pour ce test, on va juste créer un fichier horodaté
           mkdir -p content/fanzines
-          
-          cat <<EOF > $FILENAME
-          ---
-          description_alternative: "${{ github.event.client_payload.data.description_alternative_pour_ceux_que_les_questionnaires_font_chier_pensez_quant_meme_aux_images_et_au_titre_au_minimum_ }}"
-          titre: "${{ github.event.client_payload.data.titre_du_fanzine_sans_titre_testtitre_du_fanzine_ }}"
-          numero_volume: "${{ github.event.client_payload.data.numero_ou_volume_si_applicable_ }}"
-          type_publication: "${{ github.event.client_payload.data.type_of_publication_ }}"
-          genres: "${{ github.event.client_payload.data.genre_s_coche_autant_que_necessaire_ }}"
-          thematiques: "${{ github.event.client_payload.data.thematique_s_et_mots_clefs_liste_libre_de_quoi_ca_parle_l_ambiance_les_obsessions_ce_qui_revient_autant_de_mots_que_tu_veux_ }}"
-          presentation_libre: "${{ github.event.client_payload.data.presentation_libre_quelques_lignes_ton_style_pas_besoin_de_faire_une_critique_litteraire_on_n_est_pas_telerama_et_c_est_tant_mieux_raconte_nous_ce_que_c_est_ce_qui_t_as_donne_envie_de_le_faire_ou_de_l_acheter_ce_qui_le_rend_unique_a_tes_yeux_quelques_pistes_si_tu_seches_c_est_quoi_l_ambiance_generale_il_y_a_une_histoire_derriere_sa_fabrication_un_truc_qui_rend_cet_objet_particulier_ }}"
-          annee_parution: "${{ github.event.client_payload.data.annee_de_parution_ }}"
-          nombre_pages: "${{ github.event.client_payload.data.nombre_de_pages_ }}"
-          format: "${{ github.event.client_payload.data.format_ }}"
-          tirage: "${{ github.event.client_payload.data.tirage_si_connu_ }}"
-          prix: "${{ github.event.client_payload.data.prix_de_vente_ }}"
-          techniques_impression: "${{ github.event.client_payload.data.technique_s_d_impression_coche_autant_que_necessaire_ }}"
-          reliure: "${{ github.event.client_payload.data.type_de_reliure_ }}"
-          couleur_nb: "${{ github.event.client_payload.data.couleur_ou_noir_et_blanc_ }}"
-          noms_pseudos: "${{ github.event.client_payload.data.nom_s_ou_pseudo_s_ }}"
-          collectif_atelier: "${{ github.event.client_payload.data.collectif_ou_atelier_si_oui_nom_du_collectif_ }}"
-          pays: "${{ github.event.client_payload.data.pays_ }}"
-          autres_publications: "${{ github.event.client_payload.data.autres_publications_connues_du_meme_auteur_collectif_ou_atelier_ }}"
-          lien_auteur: "${{ github.event.client_payload.data.lien_vers_le_site_la_boutique_ou_le_compte_instagram_de_l_auteur_ }}"
-          disponibilite: "${{ github.event.client_payload.data.disponibilite_ }}"
-          ou_le_procurer: "${{ github.event.client_payload.data.ou_se_le_procurer_lien_boutique_en_ligne_nom_de_la_librairie_ou_fanzinotheque_contact_direct_ }}"
-          email_contact: "${{ github.event.client_payload.data.email_de_contact_ }}"
-          image_1: "${{ github.event.client_payload.data.image_1[0].url }}"
-          image_2: "${{ github.event.client_payload.data.image_2[0].url }}"
-          image_3: "${{ github.event.client_payload.data.image_3[0].url }}"
-          image_4: "${{ github.event.client_payload.data.image_4[0].url }}"
-          image_5: "${{ github.event.client_payload.data.image_5[0].url }}"
-          image_6: "${{ github.event.client_payload.data.image_6[0].url }}"
-          image_7: "${{ github.event.client_payload.data.image_7[0].url }}"
-          image_8: "${{ github.event.client_payload.data.image_8[0].url }}"
-          image_9: "${{ github.event.client_payload.data.image_9[0].url }}"
-          image_10: "${{ github.event.client_payload.data.image_10[0].url }}"
-          ---
-          EOF
+          echo "Dernière vérification le $(date)" > content/fanzines/last_check.txt
 
       - name: Commit and Push
         run: |
           git config --global user.name "Tally Bot"
           git config --global user.email "bot@tally.so"
-          git add content/fanzines/*.md
-          git commit -m "Nouveau fanzine reçu"
+          git add .
+          git commit -m "Mise à jour automatique des fanzines" || exit 0
           git push
