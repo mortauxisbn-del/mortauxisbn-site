@@ -1,8 +1,8 @@
 name: Recuperation Automatique Tally
 on:
   schedule:
-    - cron: '0 * * * *'
-  workflow_dispatch:
+    - cron: '0 * * * *' # Automatique toutes les heures
+  workflow_dispatch: # Manuel
 
 jobs:
   get_data:
@@ -16,16 +16,32 @@ jobs:
       - name: Fetch and Process
         run: |
           mkdir -p content/fanzines
-          # On crée un fichier témoin pour éviter l'erreur "pas de fichiers"
-          echo "Dernier passage du robot : $(date)" > content/fanzines/_last_sync.txt
+          # On garde le fichier témoin
+          echo "Dernier passage : $(date)" > content/fanzines/_last_sync.txt
           
-          # Tentative de récupération des données
+          # On récupère les données de Tally
           curl -s "https://api.tally.so/forms/441GVB/submissions" > data.json
+          
+          # Script pour créer les fichiers .md
+          python3 - <<EOF
+          import json, os
+          if os.path.exists('data.json'):
+              with open('data.json', 'r') as f:
+                  data = json.load(f).get('data', [])
+                  for sub in data:
+                      sid = sub['id'][:5]
+                      with open(f'content/fanzines/fanzine-{sid}.md', 'w') as out:
+                          out.write('---\n')
+                          for field in sub.get('fields', []):
+                              label = field['label'].replace(' ', '_').lower()
+                              out.write(f'{label}: "{field["value"]}"\n')
+                          out.write('---\n\nFiche fanzine.')
+          EOF
 
       - name: Commit and Push
         run: |
           git config --global user.name "Tally Bot"
           git config --global user.email "bot@tally.so"
           git add content/fanzines/
-          git commit -m "Synchro Tally" || echo "Rien à synchroniser"
+          git commit -m "Mise à jour des fanzines" || echo "Rien"
           git push
